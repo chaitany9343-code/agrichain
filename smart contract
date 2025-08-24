@@ -1,0 +1,56 @@
+module 0x4aeb779d9a9abb7bf68f63deb6230fdbe463085a268a2ad092723214b5e60dcf::main {
+    use std::string;
+    use std::vector;
+    use std::table;
+    use std::signer;
+
+    struct Product has store {
+        id: u64,
+        name: string::String,
+        status: string::String,
+        history: vector<string::String>,
+        owner: address,
+    }
+
+    struct SupplyChain has key {
+        products: table::Table<u64, Product>,
+    }
+
+    entry fun init(account: &signer) {
+        move_to(account, SupplyChain {
+            products: table::new<u64, Product>(),
+        });
+    }
+
+    public fun register_product(account: &signer, id: u64, name: string::String, status: string::String) acquires SupplyChain {
+        let supply_chain = borrow_global_mut<SupplyChain>(signer::address_of(account));
+        let history = vector::empty<string::String>();
+        vector::push_back(&mut history, status);
+
+        let product = Product {
+            id,
+            name,
+            status,
+            history,
+            owner: signer::address_of(account),
+        };
+
+        table::add(&mut supply_chain.products, id, product);
+    }
+
+    public fun update_status(account: &signer, id: u64, new_status: string::String) acquires SupplyChain {
+        let supply_chain = borrow_global_mut<SupplyChain>(signer::address_of(account));
+        let product = table::borrow_mut(&mut supply_chain.products, id);
+
+        assert!(product.owner == signer::address_of(account), 100); // Unauthorized
+
+        product.status = new_status;
+        vector::push_back(&mut product.history, new_status);
+    }
+
+    public fun get_product(account: &signer, id: u64): (u64, string::String, string::String) acquires SupplyChain {
+        let supply_chain = borrow_global<SupplyChain>(signer::address_of(account));
+        let product_ref = table::borrow(&supply_chain.products, id);
+        (product_ref.id, product_ref.name, product_ref.status)
+    }
+}
