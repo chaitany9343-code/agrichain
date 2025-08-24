@@ -1,0 +1,149 @@
+<script>
+    function showAddForm() {
+        hideForms();
+        document.getElementById('addForm').style.display = 'block';
+    }
+
+    function showUpdateForm() {
+        hideForms();
+        populateUpdateIds();
+        document.getElementById('updateForm').style.display = 'block';
+    }
+
+    function hideForms() {
+        document.getElementById('addForm').style.display = 'none';
+        document.getElementById('updateForm').style.display = 'none';
+    }
+
+    async function populateUpdateIds() {
+        const select = document.getElementById('updateProdId');
+        select.innerHTML = '';
+        try {
+            const response = await fetch('http://localhost:3000/products');
+            const products = await response.json();
+            products.forEach(p => {
+                const option = document.createElement('option');
+                option.value = p.id;
+                option.textContent = p.id;
+                select.appendChild(option);
+            });
+            if (products.length === 0) {
+                const option = document.createElement('option');
+                option.textContent = 'No products available';
+                select.appendChild(option);
+            }
+        } catch (error) {
+            console.error('Error fetching products:', error);
+        }
+    }
+
+    async function addProduct() {
+        const id = document.getElementById('prodId').value.trim();
+        const name = document.getElementById('prodName').value.trim();
+        const farmer = document.getElementById('farmerName').value.trim();
+        const date = document.getElementById('prodDate').value;
+        if (!id || !name || !farmer || !date) return;
+
+        try {
+            const productionDate = Math.floor(new Date(date).getTime() / 1000);
+            const response = await fetch('http://localhost:3000/addProduct', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: parseInt(id), name, farmer, productionDate })
+            });
+            const result = await response.json();
+            if (result.success) {
+                addLog(Product ${id} (${name}) registered by ${farmer} (Tx: ${result.transactionHash}));
+                hideForms();
+                renderTable();
+            } else {
+                alert('Error adding product: ' + result.error);
+            }
+        } catch (error) {
+            alert('Error adding product: ' + error.message);
+        }
+    }
+
+    async function updateStatus() {
+        const id = document.getElementById('updateProdId').value;
+        const checkpoint = document.getElementById('checkpoint').value;
+        const owner = document.getElementById('owner').value.trim();
+        if (!id || !checkpoint || !owner) return;
+
+        try {
+            const response = await fetch('http://localhost:3000/updateStatus', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: parseInt(id), status: checkpoint, owner })
+            });
+            const result = await response.json();
+            if (result.success) {
+                addLog(Product ${id} updated to ${checkpoint} by ${owner} (Tx: ${result.transactionHash}));
+                hideForms();
+                renderTable();
+            } else {
+                alert('Error updating status: ' + result.error);
+            }
+        } catch (error) {
+            alert('Error updating status: ' + error.message);
+        }
+    }
+
+    function addLog(message) {
+        const ul = document.getElementById('log');
+        const li = document.createElement('li');
+        li.className = 'list-group-item';
+        li.textContent = message;
+        ul.appendChild(li);
+        ul.scrollTop = ul.scrollHeight;
+    }
+
+    async function renderTable() {
+        try {
+            const response = await fetch('http://localhost:3000/products');
+            const products = await response.json();
+            const tbody = document.getElementById('productTable').querySelector('tbody');
+            tbody.innerHTML = '';
+            products.forEach(p => {
+                const lastJourney = p.journey[p.journey.length - 1];
+                const fullJourney = p.journey.map(j => ${j.status} by ${j.owner} at ${new Date(j.timestamp * 1000).toISOString()}).join('<br>');
+                const row = `
+                    <tr>
+                        <td>${p.id}</td>
+                        <td>${lastJourney.owner}</td>
+                        <td>${lastJourney.status}</td>
+                        <td>${new Date(lastJourney.timestamp * 1000).toISOString()}</td>
+                        <td>${fullJourney}</td>
+                    </tr>
+                `;
+                tbody.innerHTML += row;
+            });
+        } catch (error) {
+            console.error('Error rendering table:', error);
+        }
+    }
+
+    async function renderLogs() {
+        try {
+            const response = await fetch('http://localhost:3000/logs');
+            const logs = await response.json();
+            const ul = document.getElementById('log');
+            ul.innerHTML = '';
+            logs.forEach(log => {
+                const li = document.createElement('li');
+                li.className = 'list-group-item';
+                li.textContent = log;
+                ul.appendChild(li);
+            });
+            ul.scrollTop = ul.scrollHeight;
+        } catch (error) {
+            console.error('Error rendering logs:', error);
+        }
+    }
+
+    // Initialize table and logs on page load
+    window.onload = () => {
+        renderTable();
+        renderLogs();
+    };
+</script>
